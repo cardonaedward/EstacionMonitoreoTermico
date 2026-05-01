@@ -19,27 +19,33 @@ def recibir_datos_esp32(request):
 
             # 3. Guardar Temperatura
             if 'temperatura' in data:
-                sensor_temp = Sensor.objects.filter(dispositivo=dispositivo, tipo_variable__nombre__icontains='Temperatura').first()
+                sensor_temp = Sensor.objects.filter(dispositivo=dispositivo, tipo_variable__nombre__icontains='temp').first()
                 if sensor_temp:
                     LecturaSensor.objects.create(
                         sensor=sensor_temp,
                         valor=data['temperatura'],
-                        sensacion_termica=data.get('sensacion_termica') # Guardamos el Heat Index aquí
+                        sensacion_termica=data.get('sensacion_termica') # Si no viene en Wokwi, guardará null o vacío
                     )
+                else:
+                    print(f"ALERTA: Falta registrar un sensor de TEMPERATURA para el dispositivo {dispositivo.nombre}")
 
             # 4. Guardar Humedad
             if 'humedad' in data:
-                sensor_hum = Sensor.objects.filter(dispositivo=dispositivo, tipo_variable__nombre__icontains='Humedad').first()
+                sensor_hum = Sensor.objects.filter(dispositivo=dispositivo, tipo_variable__nombre__icontains='hum').first()
                 if sensor_hum:
                     LecturaSensor.objects.create(sensor=sensor_hum, valor=data['humedad'])
+                else:
+                    print(f"ALERTA: Falta registrar un sensor de HUMEDAD para el dispositivo {dispositivo.nombre}")
 
             # 5. Guardar Presión
             if 'presion' in data:
-                sensor_pres = Sensor.objects.filter(dispositivo=dispositivo, tipo_variable__nombre__icontains='Presión').first()
+                sensor_pres = Sensor.objects.filter(dispositivo=dispositivo, tipo_variable__nombre__icontains='pres').first()
                 if sensor_pres:
                     LecturaSensor.objects.create(sensor=sensor_pres, valor=data['presion'])
+                else:
+                    print(f"ALERTA: Falta registrar un sensor de PRESIÓN para el dispositivo {dispositivo.nombre}")
 
-            return JsonResponse({'status': 'success', 'mensaje': 'Datos de la estación guardados correctamente'}, status=201)
+            return JsonResponse({'status': 'success', 'mensaje': 'Datos procesados'}, status=201)
 
         except json.JSONDecodeError:
             return JsonResponse({'error': 'El formato JSON es inválido'}, status=400)
