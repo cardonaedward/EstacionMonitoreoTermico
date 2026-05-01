@@ -57,23 +57,22 @@ def obtener_ultimos_datos(request):
     """
     if request.method == 'GET':
         try:
-            # Buscamos la lectura más reciente de cada variable ordenando por fecha descendente ('-fecha_hora' u otro campo de fecha que tengas)
-            # Nota: Si tu campo de fecha en el modelo se llama diferente (ej. 'creado_en'), cámbialo abajo.
-            ultima_temp = LecturaSensor.objects.filter(sensor__tipo_variable__nombre__icontains='Temperatura').order_by('-id').first()
-            ultima_hum = LecturaSensor.objects.filter(sensor__tipo_variable__nombre__icontains='Humedad').order_by('-id').first()
-            ultima_pres = LecturaSensor.objects.filter(sensor__tipo_variable__nombre__icontains='Presión').order_by('-id').first()
+            # Usamos fragmentos cortos ('temp', 'hum', 'pres') para evitar fallos por tildes o nombres largos
+            ultima_temp = LecturaSensor.objects.filter(sensor__tipo_variable__nombre__icontains='temp').order_by('-id').first()
+            ultima_hum = LecturaSensor.objects.filter(sensor__tipo_variable__nombre__icontains='hum').order_by('-id').first()
+            ultima_pres = LecturaSensor.objects.filter(sensor__tipo_variable__nombre__icontains='pres').order_by('-id').first()
 
             datos = {
-                'temperatura': ultima_temp.valor if ultima_temp else 0,
-                'humedad': ultima_hum.valor if ultima_hum else 0,
-                'presion': ultima_pres.valor if ultima_pres else 0,
+                # Convertimos explícitamente a float para quitar los decimales en texto (ej. '40.000' -> 40.0)
+                'temperatura': float(ultima_temp.valor) if ultima_temp else 0,
+                'humedad': float(ultima_hum.valor) if ultima_hum else 0,
+                'presion': float(ultima_pres.valor) if ultima_pres else 0,
             }
             return JsonResponse(datos, status=200)
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
             
-    return JsonResponse({'error': 'Solo método GET permito'}, status=405)
-
+    return JsonResponse({'error': 'Solo método GET permitido'}, status=405)
 
 def obtener_historial(request):
     """
