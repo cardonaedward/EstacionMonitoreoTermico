@@ -40,6 +40,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'dashboard',
     'corsheaders',
+    'rest_framework',
+    'rest_framework_simplejwt',
 ]
 
 MIDDLEWARE = [
@@ -133,3 +135,16 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Activa la compresión de WhiteNoise para que tu panel cargue rapidísimo
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Configuración de Django REST Framework y JWT
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    )
+}
+
+from datetime import timedelta
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=1), # El usuario no tendrá que loguearse cada 5 minutos
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+}

@@ -34,7 +34,9 @@ class DispositivoIoT(models.Model):
         ('error', 'Error'),
     ]
     estacion = models.ForeignKey(EstacionMeteorologica, on_delete=models.CASCADE)
-    nombre = models.CharField(max_length=100)
+    nombre = models.CharField(max_length=100, default="Estacion Termica")
+    usuario_propietario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    codigo_validacion = models.CharField(max_length=10, null=True, blank=True)
     mac_address = models.CharField(max_length=20, unique=True)
     firmware_version = models.CharField(max_length=20, blank=True, null=True)
     tipo = models.CharField(max_length=20, choices=TIPO_CHOICES, default='esp32')
