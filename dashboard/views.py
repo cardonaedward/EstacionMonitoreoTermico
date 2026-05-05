@@ -6,7 +6,12 @@ from django.contrib.auth.hashers import make_password
 
 # --- Importaciones de Django REST Framework para la seguridad ---
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.views import TokenObtainPairView
+from django.db.models import F
 
 # Asegúrate de importar todos los modelos que usamos
 from .models import DispositivoIoT, Sensor, LecturaSensor, TipoVariable
@@ -132,6 +137,36 @@ def registrar_usuario(request):
 
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+
+# ==============================================================================
+# 4. VISTAS SAAS: ADMINISTRACIÓN Y LOGIN PERSONALIZADO
+# ==============================================================================
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        # Inyecta el rol validando si el usuario tiene privilegios en la base de datos
+        data['is_admin'] = self.user.is_staff or self.user.is_superuser
+        return data
+
+class CustomLoginView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer
+
+class AdminUsuariosView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        usuarios = User.objects.all().values('id', 'username', 'email', 'is_staff')
+        return Response(list(usuarios))
+
+class AdminDispositivosView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        # Se anota el campo "nombre" para que devuelva la clave "equipo" requerida por el frontend
+        dispositivos = DispositivoIoT.objects.annotate(equipo=F('nombre')).values('id', 'equipo', 'estado')
+        return Response(list(dispositivos))
 
 
 # SOLO usuarios con Token válido (logueados) pueden vincular placas

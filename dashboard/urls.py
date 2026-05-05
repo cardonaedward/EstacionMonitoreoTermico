@@ -9,4 +9,8 @@ urlpatterns = [
     path('api/ultimos-datos/', views.obtener_ultimos_datos, name='ultimos_datos'),
     path('api/historial/', views.obtener_historial, name='historial'),
     path('api/control/', views.control_dispositivo, name='control'),
+    
+    # --- RUTAS DE ADMINISTRACIÓN ---
+    path('api/admin/usuarios/', views.AdminUsuariosView.as_view(), name='admin_usuarios'),
+    path('api/admin/dispositivos/', views.AdminDispositivosView.as_view(), name='admin_dispositivos'),
 ]
