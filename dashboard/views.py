@@ -11,7 +11,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
-from django.db.models import F
+from django.db.models import F, Count
 
 # Asegúrate de importar todos los modelos que usamos
 from .models import DispositivoIoT, Sensor, LecturaSensor, TipoVariable, Rol, PerfilUsuario
@@ -183,18 +183,99 @@ class CustomLoginView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
 
 class AdminUsuariosView(APIView):
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsRoleAdmin]
 
     def get(self, request):
-        usuarios = User.objects.all().values('id', 'username', 'email', 'is_staff')
+        # Se anota la cantidad de dispositivos que le pertenecen a este usuario
+        usuarios = User.objects.annotate(
+            cantidad_dispositivos=Count('dispositivoiot')
+        ).values('id', 'username', 'email', 'is_staff', 'cantidad_dispositivos')
         return Response(list(usuarios))
+        
+    def post(self, request):
+        try:
+            username = request.data.get('username')
+            email = request.data.get('email', '')
+            password = request.data.get('password')
+            rol_nombre = request.data.get('rol', 'usuario_cliente')
+
+            if not username or not password:
+                return Response({'error': 'Usuario y contraseña son obligatorios'}, status=400)
+
+            if User.objects.filter(username=username).exists():
+                return Response({'error': 'El nombre de usuario ya existe'}, status=400)
+
+            nuevo_usuario = User.objects.create(
+                username=username,
+                email=email,
+                password=make_password(password)
+            )
+
+            rol, _ = Rol.objects.get_or_create(nombre=rol_nombre)
+            PerfilUsuario.objects.create(usuario=nuevo_usuario, rol=rol)
+
+            return Response({'status': 'success', 'mensaje': 'Usuario creado exitosamente'}, status=201)
+        except Exception as e:
+            return Response({'error': str(e)}, status=500)
+
+    def put(self, request):
+        try:
+            user_id = request.data.get('id')
+            if not user_id:
+                return Response({'error': 'Se requiere el ID del usuario para actualizar'}, status=400)
+
+            usuario = User.objects.get(id=user_id)
+            
+            if 'username' in request.data:
+                usuario.username = request.data['username']
+            if 'email' in request.data:
+                usuario.email = request.data['email']
+            if 'password' in request.data and request.data['password']:
+                usuario.password = make_password(request.data['password'])
+            
+            usuario.save()
+
+            # Si se envía un rol para actualizar
+            if 'rol' in request.data:
+                rol_nombre = request.data['rol']
+                rol, _ = Rol.objects.get_or_create(nombre=rol_nombre)
+                perfil, _ = PerfilUsuario.objects.get_or_create(usuario=usuario)
+                perfil.rol = rol
+                perfil.save()
+
+            return Response({'status': 'success', 'mensaje': 'Usuario actualizado exitosamente'}, status=200)
+        except User.DoesNotExist:
+            return Response({'error': 'Usuario no encontrado'}, status=404)
+        except Exception as e:
+            return Response({'error': str(e)}, status=500)
+            
+    def delete(self, request):
+        try:
+            # Permitimos recibir el ID tanto por la URL (?id=X) como en el body
+            user_id = request.query_params.get('id') or request.data.get('id')
+            
+            if not user_id:
+                return Response({'error': 'Se requiere el ID del usuario para eliminar'}, status=400)
+
+            usuario = User.objects.get(id=user_id)
+            usuario.delete()
+
+            return Response({'status': 'success', 'mensaje': 'Usuario eliminado exitosamente'}, status=200)
+        except User.DoesNotExist:
+            return Response({'error': 'Usuario no encontrado'}, status=404)
+        except Exception as e:
+            return Response({'error': str(e)}, status=500)
 
 class AdminDispositivosView(APIView):
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsRoleAdmin]
 
     def get(self, request):
         # Se anota el campo "nombre" para que devuelva la clave "equipo" requerida por el frontend
-        dispositivos = DispositivoIoT.objects.annotate(equipo=F('nombre')).values('id', 'equipo', 'estado')
+        # Se incluye "propietario" apuntando a la clave foránea del usuario
+        dispositivos = DispositivoIoT.objects.annotate(
+            equipo=F('nombre'),
+            propietario=F('usuario_propietario_id')
+        ).values('id', 'equipo', 'estado', 'propietario')
         return Response(list(dispositivos))
 
 class AdminUsuariosDispositivosView(APIView):
