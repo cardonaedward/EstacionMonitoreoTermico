@@ -6,7 +6,7 @@ from django.contrib.auth.hashers import make_password
 
 # --- Importaciones de Django REST Framework para la seguridad ---
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
+from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser, BasePermission
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
@@ -14,7 +14,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from django.db.models import F
 
 # Asegúrate de importar todos los modelos que usamos
-from .models import DispositivoIoT, Sensor, LecturaSensor, TipoVariable
+from .models import DispositivoIoT, Sensor, LecturaSensor, TipoVariable, Rol, PerfilUsuario
 
 
 # ==============================================================================
@@ -127,11 +127,15 @@ def registrar_usuario(request):
         if User.objects.filter(username=username).exists():
             return JsonResponse({'error': 'El nombre de usuario ya existe'}, status=400)
 
-        User.objects.create(
+        nuevo_usuario = User.objects.create(
             username=username,
             email=email,
             password=make_password(password)
         )
+
+        # Asignar el rol por defecto de "Cliente"
+        rol_cliente, _ = Rol.objects.get_or_create(nombre='Cliente', defaults={'descripcion': 'Usuario estándar del sistema'})
+        PerfilUsuario.objects.create(usuario=nuevo_usuario, rol=rol_cliente)
 
         return JsonResponse({'status': 'success', 'mensaje': 'Usuario creado exitosamente'}, status=201)
 
@@ -143,11 +147,27 @@ def registrar_usuario(request):
 # 4. VISTAS SAAS: ADMINISTRACIÓN Y LOGIN PERSONALIZADO
 # ==============================================================================
 
+# --- Permiso Customizado basado en el Rol ---
+class IsRoleAdmin(BasePermission):
+    """
+    Permite el acceso solo a usuarios que tengan asociado explícitamente el rol de 'Administrador'
+    en nuestro modelo Rol.
+    """
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        try:
+            return request.user.perfilusuario.rol.nombre.lower() == 'administrador'
+        except Exception:
+            return False
+
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
         data = super().validate(attrs)
-        # Inyecta el rol validando si el usuario tiene privilegios en la base de datos
-        data['is_admin'] = self.user.is_staff or self.user.is_superuser
+        try:
+            data['is_admin'] = self.user.perfilusuario.rol.nombre.lower() == 'administrador'
+        except Exception:
+            data['is_admin'] = self.user.is_staff or self.user.is_superuser
         return data
 
 class CustomLoginView(TokenObtainPairView):
@@ -167,6 +187,27 @@ class AdminDispositivosView(APIView):
         # Se anota el campo "nombre" para que devuelva la clave "equipo" requerida por el frontend
         dispositivos = DispositivoIoT.objects.annotate(equipo=F('nombre')).values('id', 'equipo', 'estado')
         return Response(list(dispositivos))
+
+class AdminUsuariosDispositivosView(APIView):
+    # Usamos nuestro nuevo permiso basado en la base de datos
+    permission_classes = [IsRoleAdmin]
+
+    def get(self, request):
+        usuarios = User.objects.all().prefetch_related('perfilusuario')
+        resultado = []
+        for usuario in usuarios:
+            dispositivos = DispositivoIoT.objects.filter(usuario_propietario=usuario).values('id', 'nombre', 'mac_address', 'estado')
+            try:
+                rol = usuario.perfilusuario.rol.nombre
+            except Exception:
+                rol = 'Sin Rol'
+            resultado.append({
+                'id': usuario.id,
+                'username': usuario.username,
+                'rol': rol,
+                'dispositivos_asociados': list(dispositivos)
+            })
+        return Response(resultado)
 
 
 # SOLO usuarios con Token válido (logueados) pueden vincular placas

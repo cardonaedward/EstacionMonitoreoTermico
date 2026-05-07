@@ -238,3 +238,21 @@ class AuditoriaSistema(models.Model):
     registro_id = models.IntegerField(blank=True, null=True)
     detalle = models.TextField(blank=True, null=True)
     ocurrido_en = models.DateTimeField(auto_now_add=True)
+
+# ─────────────────────────────────────────────────────────────
+# GRUPO 7 — Control de Roles y Perfiles
+# ─────────────────────────────────────────────────────────────
+
+class Rol(models.Model):
+    nombre = models.CharField(max_length=50, unique=True)
+    descripcion = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return self.nombre
+
+class PerfilUsuario(models.Model):
+    usuario = models.OneToOneField(User, on_delete=models.CASCADE)
+    rol = models.ForeignKey(Rol, on_delete=models.SET_NULL, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.usuario.username} - {self.rol.nombre if self.rol else 'Sin Rol'}"

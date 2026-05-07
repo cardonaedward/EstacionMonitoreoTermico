@@ -13,4 +13,5 @@ urlpatterns = [
     # --- RUTAS DE ADMINISTRACIÓN ---
     path('api/admin/usuarios/', views.AdminUsuariosView.as_view(), name='admin_usuarios'),
     path('api/admin/dispositivos/', views.AdminDispositivosView.as_view(), name='admin_dispositivos'),
+    path('api/admin/usuarios-dispositivos/', views.AdminUsuariosDispositivosView.as_view(), name='admin_usuarios_dispositivos'),
 ]

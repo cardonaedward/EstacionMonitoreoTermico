@@ -5,7 +5,9 @@ from .models import (
     TipoVariable, 
     Sensor, 
     LecturaSensor, 
-    Alerta
+    Alerta,
+    Rol,
+    PerfilUsuario
 )
 
 # Registros simples para la configuración
@@ -13,6 +15,8 @@ admin.site.register(EstacionMeteorologica)
 admin.site.register(DispositivoIoT)
 admin.site.register(TipoVariable)
 admin.site.register(Sensor)
+admin.site.register(Rol)
+admin.site.register(PerfilUsuario)
 
 # Registros avanzados (con tablas ordenadas) para los datos
 @admin.register(LecturaSensor)
