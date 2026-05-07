@@ -10,6 +10,11 @@ urlpatterns = [
     path('api/historial/', views.obtener_historial, name='historial'),
     path('api/control/', views.control_dispositivo, name='control'),
     
+    # --- RUTAS DE AUTENTICACIÓN Y SAAS ---
+    path('api/login/', views.CustomLoginView.as_view(), name='custom_login'),
+    path('api/registrar-usuario/', views.registrar_usuario, name='registrar_usuario'),
+    path('api/vincular-dispositivo/', views.vincular_dispositivo, name='vincular_dispositivo'),
+
     # --- RUTAS DE ADMINISTRACIÓN ---
     path('api/admin/usuarios/', views.AdminUsuariosView.as_view(), name='admin_usuarios'),
     path('api/admin/dispositivos/', views.AdminDispositivosView.as_view(), name='admin_dispositivos'),

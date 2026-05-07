@@ -133,8 +133,8 @@ def registrar_usuario(request):
             password=make_password(password)
         )
 
-        # Asignar el rol por defecto de "Cliente"
-        rol_cliente, _ = Rol.objects.get_or_create(nombre='Cliente', defaults={'descripcion': 'Usuario estándar del sistema'})
+        # Asignar el rol por defecto de "usuario_cliente"
+        rol_cliente, _ = Rol.objects.get_or_create(nombre='usuario_cliente', defaults={'descripcion': 'Usuario estándar del sistema'})
         PerfilUsuario.objects.create(usuario=nuevo_usuario, rol=rol_cliente)
 
         return JsonResponse({'status': 'success', 'mensaje': 'Usuario creado exitosamente'}, status=201)
@@ -150,22 +150,31 @@ def registrar_usuario(request):
 # --- Permiso Customizado basado en el Rol ---
 class IsRoleAdmin(BasePermission):
     """
-    Permite el acceso solo a usuarios que tengan asociado explícitamente el rol de 'Administrador'
+    Permite el acceso solo a usuarios que tengan asociado explícitamente el rol de 'admin'
     en nuestro modelo Rol.
     """
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
         try:
-            return request.user.perfilusuario.rol.nombre.lower() == 'administrador'
+            return request.user.perfilusuario.rol.nombre.lower() == 'admin'
         except Exception:
             return False
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        try:
+            token['is_admin'] = user.perfilusuario.rol.nombre.lower() == 'admin'
+        except Exception:
+            token['is_admin'] = user.is_staff or user.is_superuser
+        return token
+
     def validate(self, attrs):
         data = super().validate(attrs)
         try:
-            data['is_admin'] = self.user.perfilusuario.rol.nombre.lower() == 'administrador'
+            data['is_admin'] = self.user.perfilusuario.rol.nombre.lower() == 'admin'
         except Exception:
             data['is_admin'] = self.user.is_staff or self.user.is_superuser
         return data
