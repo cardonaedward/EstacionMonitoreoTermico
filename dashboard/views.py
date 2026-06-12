@@ -159,7 +159,7 @@ def solicitar_restablecimiento(request):
     
     email = serializer.validated_data['email']
     try:
-        usuario = User.objects.get(email=email)
+        usuario = User.objects.get(email__iexact=email)
         
         # Generar código de 4 dígitos
         codigo_aleatorio = str(random.randint(1000, 9999))
@@ -190,6 +190,7 @@ def solicitar_restablecimiento(request):
     except User.DoesNotExist:
         return Response({'error': 'Usuario no encontrado'}, status=404)
     except Exception as e:
+        print(f"DEBUG: Error enviando correo: {e}")
         return Response({'error': str(e)}, status=500)
 
 @api_view(['POST'])
