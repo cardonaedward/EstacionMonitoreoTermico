@@ -15,6 +15,10 @@ urlpatterns = [
     path('api/registrar-usuario/', views.registrar_usuario, name='registrar_usuario'),
     path('api/vincular-dispositivo/', views.vincular_dispositivo, name='vincular_dispositivo'),
 
+    # --- RUTAS RECUPERACIÓN DE CONTRASEÑA ---
+    path('api/password-reset/solicitar/', views.solicitar_restablecimiento, name='pw_reset_solicitar'),
+    path('api/password-reset/confirmar/', views.confirmar_restablecimiento, name='pw_reset_confirmar'),
+
     # --- RUTAS DE ADMINISTRACIÓN ---
     path('api/admin/usuarios/', views.AdminUsuariosView.as_view(), name='admin_usuarios'),
     path('api/admin/dispositivos/', views.AdminDispositivosView.as_view(), name='admin_dispositivos'),

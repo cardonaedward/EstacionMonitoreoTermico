@@ -1,5 +1,10 @@
 import json
+import random
 from django.http import JsonResponse
+from django.core.mail import EmailMultiAlternatives
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import make_password
@@ -14,12 +19,13 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from django.db.models import F, Count
 
 # Asegúrate de importar todos los modelos que usamos
-from .models import DispositivoIoT, Sensor, LecturaSensor, TipoVariable, Rol, PerfilUsuario
+from .models import DispositivoIoT, Sensor, LecturaSensor, TipoVariable, Rol, PerfilUsuario, PasswordResetCode
+from .serializers import PasswordResetRequestSerializer, PasswordResetConfirmSerializer
 
 
-# ==============================================================================
-# 1. VISTAS DEL HARDWARE (ESP32) - Sin protección JWT porque es un microcontrolador
-# ==============================================================================
+# ===============================
+# 1. VISTAS DEL HARDWARE (ESP32) 
+# ===============================
 
 @csrf_exempt  
 def recibir_datos_esp32(request):
@@ -62,12 +68,13 @@ def recibir_datos_esp32(request):
     return JsonResponse({'error': 'Solo se permiten peticiones POST'}, status=405)
 
 
-# ==============================================================================
-# 2. VISTAS DEL FRONTEND (ANGULAR) - Datos del Dashboard
-# ==============================================================================
+# =============================================
+# 2. VISTAS DEL FRONTEND  - Datos del Dashboard
+# =============================================
 
 # Nota: Por ahora mantenemos el GET público. Cuando configuremos Angular con JWT, 
 # cambiaremos esto para que solo traiga los datos del dispositivo del usuario logueado.
+
 def obtener_ultimos_datos(request):
     if request.method == 'GET':
         try:
@@ -141,6 +148,78 @@ def registrar_usuario(request):
 
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def solicitar_restablecimiento(request):
+    serializer = PasswordResetRequestSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=400)
+    
+    email = serializer.validated_data['email']
+    try:
+        usuario = User.objects.get(email=email)
+        
+        # Generar código de 4 dígitos
+        codigo_aleatorio = str(random.randint(1000, 9999))
+        
+        # Guardar en la BD (borrar códigos anteriores del mismo usuario para limpieza)
+        PasswordResetCode.objects.filter(user=usuario).delete()
+        PasswordResetCode.objects.create(user=usuario, code=codigo_aleatorio)
+        
+        # Configuración del correo HTML
+        asunto = 'Código de recuperación - Estación Térmica'
+        contexto = {
+            'username': usuario.username,
+            'codigo': codigo_aleatorio
+        }
+        html_content = render_to_string('emails/password_reset.html', contexto)
+        text_content = strip_tags(html_content) # Versión en texto plano para clientes antiguos
+
+        email_mensaje = EmailMultiAlternatives(
+            asunto,
+            text_content,
+            None, # Usa DEFAULT_FROM_EMAIL de settings.py
+            [email]
+        )
+        email_mensaje.attach_alternative(html_content, "text/html")
+        email_mensaje.send()
+        
+        return Response({'status': 'success', 'mensaje': 'Código enviado al correo'}, status=200)
+    except User.DoesNotExist:
+        return Response({'error': 'Usuario no encontrado'}, status=404)
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def confirmar_restablecimiento(request):
+    serializer = PasswordResetConfirmSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=400)
+    
+    email = serializer.validated_data['email']
+    codigo = serializer.validated_data['codigo']
+    nueva_password = serializer.validated_data['nueva_password']
+    
+    try:
+        usuario = User.objects.get(email=email)
+        reset_obj = PasswordResetCode.objects.filter(user=usuario, code=codigo).first()
+        
+        if not reset_obj:
+            return Response({'error': 'Código inválido'}, status=400)
+        
+        if reset_obj.is_expired():
+            return Response({'error': 'Código expirado'}, status=400)
+        
+        usuario.set_password(nueva_password)
+        usuario.save()
+        reset_obj.delete() # Limpiar código usado
+        
+        return Response({'status': 'success', 'mensaje': 'Contraseña actualizada exitosamente'}, status=200)
+    except User.DoesNotExist:
+        return Response({'error': 'Usuario no encontrado'}, status=404)
 
 
 # ==============================================================================

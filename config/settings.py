@@ -147,3 +147,12 @@ SIMPLE_JWT = {
 }
 
 CORS_ALLOW_ALL_ORIGINS = True
+
+# Configuración de Correo SMTP
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com' # Cambiar por tu proveedor
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'tu-email@gmail.com' # Tu correo
+EMAIL_HOST_PASSWORD = 'tu-contraseña-de-aplicacion' # Contraseña de aplicación
+DEFAULT_FROM_EMAIL = 'Estación Térmica <tu-email@gmail.com>'
