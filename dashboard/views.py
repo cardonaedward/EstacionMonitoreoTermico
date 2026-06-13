@@ -19,7 +19,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from django.db.models import F, Count
 
 # Asegúrate de importar todos los modelos que usamos
-from .models import DispositivoIoT, Sensor, LecturaSensor, TipoVariable, Rol, PerfilUsuario, PasswordResetCode
+from .models import DispositivoIoT, Sensor, LecturaSensor, TipoVariable, Rol, PerfilUsuario, PasswordResetCode, EstacionMeteorologica
 from .serializers import PasswordResetRequestSerializer, PasswordResetConfirmSerializer
 
 
@@ -30,6 +30,7 @@ from .serializers import PasswordResetRequestSerializer, PasswordResetConfirmSer
 @csrf_exempt  
 def recibir_datos_esp32(request):
     if request.method == 'POST':
+        print(f"DEBUG Hardware: Petición entrante. Body: {request.body.decode('utf-8')}")
         try:
             data = json.loads(request.body)
             # Limpiamos la MAC recibida para evitar fallos por espacios o mayúsculas
@@ -40,11 +41,13 @@ def recibir_datos_esp32(request):
 
             dispositivo = DispositivoIoT.objects.filter(mac_address__iexact=mac_recibida).first()
             if not dispositivo:
+                print(f"DEBUG Hardware: Error 404 - La MAC '{mac_recibida}' no existe en la base de datos.")
                 return JsonResponse({'error': f'Dispositivo con MAC {mac_recibida} no existe en la BD'}, status=404)
 
             if 'temperatura' in data:
                 sensor_temp = Sensor.objects.filter(dispositivo=dispositivo, tipo_variable__nombre__icontains='temp').first()
                 if sensor_temp:
+                    print(f"DEBUG Hardware: Guardando temperatura {data['temperatura']} para sensor {sensor_temp.id}")
                     LecturaSensor.objects.create(
                         sensor=sensor_temp,
                         valor=data['temperatura'],
@@ -80,6 +83,7 @@ def recibir_datos_esp32(request):
 
 def obtener_ultimos_datos(request):
     if request.method == 'GET':
+        print("DEBUG Frontend: Solicitud de últimos datos recibida.")
         try:
             ultima_temp = LecturaSensor.objects.filter(sensor__tipo_variable__nombre__icontains='temp').order_by('-id').first()
             ultima_hum = LecturaSensor.objects.filter(sensor__tipo_variable__nombre__icontains='hum').order_by('-id').first()
@@ -398,13 +402,20 @@ def vincular_dispositivo(request):
         if not mac_recibida or not codigo_ingresado:
             return JsonResponse({'error': 'Faltan datos de vinculación'}, status=400)
 
-        # 1. Crear (o actualizar si ya existía) el dispositivo y asignarle el dueño
+        # 1. Asegurar que exista una estación para evitar errores de integridad
+        estacion_base, _ = EstacionMeteorologica.objects.get_or_create(
+            nombre="Estación Base",
+            defaults={'latitud': 0, 'longitud': 0}
+        )
+
+        # 2. Crear (o actualizar si ya existía) el dispositivo y asignarle el dueño
         dispositivo, creado = DispositivoIoT.objects.update_or_create(
             mac_address=mac_recibida,
             defaults={
                 'nombre': nombre_personalizado,
                 'usuario_propietario': usuario_actual,
-                'codigo_validacion': codigo_ingresado
+                'codigo_validacion': codigo_ingresado,
+                'estacion': estacion_base
             }
         )
 
