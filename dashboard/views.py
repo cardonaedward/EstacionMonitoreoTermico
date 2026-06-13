@@ -45,24 +45,28 @@ def recibir_datos_esp32(request):
                 return JsonResponse({'error': f'Dispositivo con MAC {mac_recibida} no existe en la BD'}, status=404)
 
             if 'temperatura' in data:
-                sensor_temp = Sensor.objects.filter(dispositivo=dispositivo, tipo_variable__nombre__icontains='temp').first()
+                # Buscamos el sensor de temperatura para este dispositivo específico
+                sensor_temp = Sensor.objects.filter(dispositivo=dispositivo, tipo_variable__nombre__icontains='temp').first() or \
+                              Sensor.objects.filter(dispositivo=dispositivo, tipo_variable__nombre__icontains='t').first()
                 if sensor_temp:
-                    print(f"DEBUG Hardware: Guardando temperatura {data['temperatura']} para sensor {sensor_temp.id}")
                     LecturaSensor.objects.create(
                         sensor=sensor_temp,
                         valor=data['temperatura'],
                         sensacion_termica=data.get('sensacion_termica')
                     )
+                    print(f"✅ Guardado: Temp {data['temperatura']} para {mac_recibida}")
 
             if 'humedad' in data:
                 sensor_hum = Sensor.objects.filter(dispositivo=dispositivo, tipo_variable__nombre__icontains='hum').first()
                 if sensor_hum:
                     LecturaSensor.objects.create(sensor=sensor_hum, valor=data['humedad'])
+                    print(f"✅ Guardado: Hum {data['humedad']}")
 
             if 'presion' in data:
                 sensor_pres = Sensor.objects.filter(dispositivo=dispositivo, tipo_variable__nombre__icontains='pres').first()
                 if sensor_pres:
                     LecturaSensor.objects.create(sensor=sensor_pres, valor=data['presion'])
+                    print(f"✅ Guardado: Pres {data['presion']}")
 
             return JsonResponse({'status': 'success', 'mensaje': 'Datos procesados'}, status=201)
 
@@ -81,24 +85,29 @@ def recibir_datos_esp32(request):
 # Nota: Por ahora mantenemos el GET público. Cuando configuremos Angular con JWT, 
 # cambiaremos esto para que solo traiga los datos del dispositivo del usuario logueado.
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def obtener_ultimos_datos(request):
-    if request.method == 'GET':
-        print("DEBUG Frontend: Solicitud de últimos datos recibida.")
-        try:
-            ultima_temp = LecturaSensor.objects.filter(sensor__tipo_variable__nombre__icontains='temp').order_by('-id').first()
-            ultima_hum = LecturaSensor.objects.filter(sensor__tipo_variable__nombre__icontains='hum').order_by('-id').first()
-            ultima_pres = LecturaSensor.objects.filter(sensor__tipo_variable__nombre__icontains='pres').order_by('-id').first()
+    try:
+        # Filtramos para obtener el dispositivo que pertenece al usuario autenticado
+        dispositivo = DispositivoIoT.objects.filter(usuario_propietario=request.user).last()
+        
+        if not dispositivo:
+            return Response({'temperatura': 0, 'humedad': 0, 'presion': 0, 'mensaje': 'Sin dispositivo'}, status=200)
 
-            datos = {
-                'temperatura': float(ultima_temp.valor) if ultima_temp else 0,
-                'humedad': float(ultima_hum.valor) if ultima_hum else 0,
-                'presion': float(ultima_pres.valor) if ultima_pres else 0,
-            }
-            return JsonResponse(datos, status=200)
-        except Exception as e:
-            return JsonResponse({'error': str(e)}, status=500)
-            
-    return JsonResponse({'error': 'Solo método GET permitido'}, status=405)
+        # Obtenemos las últimas lecturas vinculadas específicamente a los sensores de ese dispositivo
+        ultima_temp = LecturaSensor.objects.filter(sensor__dispositivo=dispositivo, sensor__tipo_variable__nombre__icontains='temp').last()
+        ultima_hum = LecturaSensor.objects.filter(sensor__dispositivo=dispositivo, sensor__tipo_variable__nombre__icontains='hum').last()
+        ultima_pres = LecturaSensor.objects.filter(sensor__dispositivo=dispositivo, sensor__tipo_variable__nombre__icontains='pres').last()
+
+        datos = {
+            'temperatura': float(ultima_temp.valor) if ultima_temp else 0.0,
+            'humedad': float(ultima_hum.valor) if ultima_hum else 0.0,
+            'presion': float(ultima_pres.valor) if ultima_pres else 0.0,
+        }
+        return Response(datos)
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
 
 def obtener_historial(request):
     if request.method == 'GET':
@@ -424,11 +433,10 @@ def vincular_dispositivo(request):
         var_hum, _ = TipoVariable.objects.get_or_create(nombre='Humedad')
         var_pres, _ = TipoVariable.objects.get_or_create(nombre='Presión')
 
-        # 3. Soldar los cables virtuales (crear sensores si la placa es nueva)
-        if creado:
-            Sensor.objects.get_or_create(dispositivo=dispositivo, tipo_variable=var_temp)
-            Sensor.objects.get_or_create(dispositivo=dispositivo, tipo_variable=var_hum)
-            Sensor.objects.get_or_create(dispositivo=dispositivo, tipo_variable=var_pres)
+        # 3. Soldar los cables virtuales (aseguramos que los sensores existan siempre)
+        Sensor.objects.get_or_create(dispositivo=dispositivo, tipo_variable=var_temp)
+        Sensor.objects.get_or_create(dispositivo=dispositivo, tipo_variable=var_hum)
+        Sensor.objects.get_or_create(dispositivo=dispositivo, tipo_variable=var_pres)
 
         return JsonResponse({
             'status': 'success', 
