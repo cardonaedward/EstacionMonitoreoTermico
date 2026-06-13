@@ -23,7 +23,10 @@ SECRET_KEY = 'django-insecure-*qkq6*zdizo^4$qjbxb(t%bsjr4i1szv=7&4cf8#(h0^tc-l6b
 DEBUG = True
 
 ALLOWED_HOSTS = ['*']
-CSRF_TRUSTED_ORIGINS = ['https://balanced-exploration-production.up.railway.app']
+CSRF_TRUSTED_ORIGINS = [
+    'https://balanced-exploration-production.up.railway.app',
+    'https://frontendestaciontermica-production.up.railway.app'
+]
 
 # Application definition
 
@@ -41,9 +44,8 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    
-    'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -148,7 +150,11 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
 }
 
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOWED_ORIGINS = [
+    "https://frontendestaciontermica-production.up.railway.app",
+    "http://localhost:4200",
+]
+CORS_ALLOW_CREDENTIALS = True
 
 # Configuración de Correo SMTP
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
