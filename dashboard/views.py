@@ -32,12 +32,15 @@ def recibir_datos_esp32(request):
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            mac_recibida = data.get('mac_address')
+            # Limpiamos la MAC recibida para evitar fallos por espacios o mayúsculas
+            mac_recibida = str(data.get('mac_address', '')).strip()
             
-            try:
-                dispositivo = DispositivoIoT.objects.get(mac_address=mac_recibida)
-            except DispositivoIoT.DoesNotExist:
-                return JsonResponse({'error': f'Dispositivo con MAC {mac_recibida} no registrado'}, status=404)
+            if not mac_recibida:
+                return JsonResponse({'error': 'Falta el campo mac_address'}, status=400)
+
+            dispositivo = DispositivoIoT.objects.filter(mac_address__iexact=mac_recibida).first()
+            if not dispositivo:
+                return JsonResponse({'error': f'Dispositivo con MAC {mac_recibida} no existe en la BD'}, status=404)
 
             if 'temperatura' in data:
                 sensor_temp = Sensor.objects.filter(dispositivo=dispositivo, tipo_variable__nombre__icontains='temp').first()
